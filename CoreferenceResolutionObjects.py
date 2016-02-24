@@ -7,6 +7,7 @@ Documents represent a collection of sentences
 """
 
 from collections import defaultdict
+from nltk.tree import *
 
 class Word(object):
 
@@ -28,46 +29,76 @@ class Sentence(object):
 	"""
 
 	def __init__(self, word_strings):
-		self.words = self.words_from_string(word_strings) 		#list of Word objects
-		self.tree = SyntaxTree(self.words)
-		self.entities = []
+		#words - Word objects for each word in the sentence
+		#entities - list of tuples (entity string, [string start index, end index])
+		self.words, self.entities = self.words_from_string(word_strings) 		#list of Word objects
+		self.tree = self.make_tree(word_strings)
 
-	def words_from_string(word_strings):
+	def words_from_string(self, word_strings):
 		"""create Word objects from string representing a word and its features"""
-		
-		on_entity = 0
-		on_entity_type = False
+
 		words = []
-		entity_names = defaultdict(str)
+		on_entity = 0 # track how many entities are currently being processes
+		entities = defaultdict()
+		current_entities = defaultdict(list)
 		entity_type = None
 
-		for word in word_strings:
+		for i, word in enumerate(word_strings):
 			word = word.split()
 			#determine if word is an entity and its entity type if it has one
 			on_entity += word[-1].count('(')
 			if '(' in word[10]:
 				entity_type = word[10][1:-1]
-			else:
-				entity_type = None
 			words.append(Word(word, entity_type=entity_type, is_entity=on_entity))
-			# keep track of the entity strings in sentence
+			
+			# keep track of the entity strings in sentence and touple it with its
+			#location in the sentence for indexing later
 			if on_entity:
-				for i in xrange(on_entity):
-					entity_names[i] += (' ' + word[3])
+				for j in xrange(on_entity):
+					# pair the word with its index in the sentence
+					pair = [word[3], i]
+					current_entities[j].append(tuple(pair))
 			else:
-				for entity in entity_names: self.entities.append(entity)
-				entity_name = defaultdict(str)
+				for entity in current_entities:
+					string, indices = self.resolve_entity(current_entities[entity])
+					entities[string] = indices
+				current_entities = defaultdict(list)
+
 			# end entity and entity type if there is a closure
 			on_entity -= word[-1].count(')')
 			if ')' in word[10]:
-				on_entity_type = False
+				entity_type = None
 
-		return words
+		return words, entities
 
-	def make_tree(self, words):
+	def resolve_entity(self, entity):
+		"""
+		entity comes in as a list of tuples(word, word_index)
+		return the string of all words and the first and last index
+		"""
+
+		string = ' '.join([word for word, index in entity])
+		indices = [entity[0][1], entity[-1][1]]
+
+		return string, indices	
+
+	def make_tree(self, word_strings):
+		"""make nltk tree object from the sentence"""
+
+		POS_envs = []
+		for i,word in enumerate(word_strings):
+			word = word.split()
+			env = word[5]
+			POS_envs.append(env)
+
+		s = ''.join(POS_envs).replace('*', '')
+
+		return Tree.fromstring(s)
+
+	def old_make_tree(self, words):
 		return SyntaxTree(words, words[0]).make_tree()
 
-	def find_entities(self, words):
+	def old_find_entities(self, words):
 		return [word for word in words if word.is_entity]
 
 class Document(object):
@@ -92,11 +123,12 @@ class Node(object):
 
 
 class SyntaxTree(object):
+	"""
+	no need for this class anymore
+	"""
 
-	def __init__(self, sentence):
-		self.top = Node("TOP")
-		self.sentence = sentence
-		#self.make_tree(sentence)
+	def __init__(self, word_strings):
+		self.tree = None
 
 	def pprint(self, indent=0, node=None):
 		if not node:
@@ -195,11 +227,9 @@ def test():
 				'bc/cctv/00/cctv_0000   0   22    attention     NN     *)))))))   attention   -   3   Speaker#1       *             *            *        *)     -',
 				'bc/cctv/00/cctv_0000   0   23            .      .          *))          -    -   -   Speaker#1       *             *            *        *      -',]
 
-	instance = [x.split() for x in instance]
-	# need to do non-trivial Word creation to track which words are entities, plus add other attributes 
-	words = [Word(w[3], POS=w[4], POS_phrase=w[5]) for w in instance]
-	sentence = Sentence(words)
-	#print sentence.tree.top
+	sentence = Sentence(instance)
+	print sentence.entities
+	print sentence.tree
 
 
 
