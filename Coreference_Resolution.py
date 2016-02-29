@@ -59,13 +59,14 @@ class CoreferenceResolution(object):
 		tuple pointing to the location of the string in the document
 		{0 : ['string', (sent_num, [entity start index, end index])]}
 		"""
-		print doc.entities
+	
 		for i, e1 in enumerate(doc.entities):
 			chained = False
 			e1_words = self.resolve_entity(e1)
 			for j, e2 in enumerate(doc.entities):
 				#make sure we don't compare more than we have to
 				#and we don't compare words already in a chain
+				print e1[0].chain
 				if j > i and e1.chain is None and e2.chain is None: 
 						if e1_words == self.resolve_entity(e2):
 							self.chain(doc, e1, e2, chain=i)
@@ -106,7 +107,6 @@ class CoreferenceResolution(object):
 
 
 	def resolve_entity(self, e):
-		print e
 		return [word.word for word in e]
 
 	def resolve(self):

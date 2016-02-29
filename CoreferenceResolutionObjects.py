@@ -65,7 +65,7 @@ class Sentence(object):
 					# pair the word with its index in the sentence
 					#pair = [word[3], i]
 					#current_entities[j].append(tuple(pair))
-					current_entities[j].append(new_word.word)
+					current_entities[j].append(new_word)
 			else:
 				"""
 				for entity in current_entities:
