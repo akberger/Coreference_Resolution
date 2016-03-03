@@ -13,17 +13,17 @@ class Word(object):
 
 	def __init__(self, s, index, sent_num, entity_type=None, is_entity=False):
 		self.index = index
+		self.part = s[1]
 		self.word = s[3]
 		self.POS = s[4]
 		self.POS_phrase = s[5]
-		self.infinitive = s[6] if s[6] is not '_' else None
-		self.sense1 = s[7] if s[7] is not '_' else None
-		self.sense2 = s[8] if s[8] is not '_' else None
+		self.infinitive = s[6] if s[6] is not '-' else None
+		self.sense1 = s[7] if s[7] is not '-' else None
+		self.sense2 = s[8] if s[8] is not '-' else None
 		self.entity_type = None
 		self.is_entity = True if is_entity else False
 		self.chain = None
 		self.sent_num = sent_num
-		#add other features
 
 class Sentence(object):
 	"""
@@ -32,20 +32,27 @@ class Sentence(object):
 	"""
 
 	def __init__(self, word_strings, sent_num):
+		self.sent_num = sent_num
 		#words - Word objects for each word in the sentence
 		#entities - list of lists of Word objects. Each index corresponds to an entity
-		self.sent_num = sent_num
 		self.words, self.entities = self.words_from_string(word_strings) 
 		self.tree = self.make_tree(word_strings)
 		
 
 	def words_from_string(self, word_strings):
-		"""create Word objects from string representing a word and its features"""
+		"""create Word objects from string representing a word and its features
+
+		Uncommenting the comment blocks in this method would allow for every entity to
+		be captured, which means that nested entities would be captured, not just
+		the largest entity part of a nested entity. I did not have time, however, to 
+		figure out how to address these nested entities in chaining and the output.
+		"""
 
 		words = []
 		on_entity = 0 # track how many entities are currently being processes
 		entities = []
-		current_entities = defaultdict(list)
+		"""current_entities = defaultdict(list)"""
+		current_entity = []
 		entity_type = None
 
 		for i, word in enumerate(word_strings):
@@ -56,25 +63,24 @@ class Sentence(object):
 				entity_type = word[10][1:-1]
 			new_word = Word(word, i, self.sent_num, entity_type=entity_type, is_entity=on_entity)
 			words.append(new_word)
-			#words.append(Word(word, i, self.sent_num, entity_type=entity_type, is_entity=on_entity))
 			
 			# keep track of the entity strings in sentence and touple it with its
 			#location in the sentence for indexing later
 			if on_entity:
-				for j in xrange(on_entity):
-					# pair the word with its index in the sentence
-					#pair = [word[3], i]
-					#current_entities[j].append(tuple(pair))
-					current_entities[j].append(new_word)
-			else:
 				"""
-				for entity in current_entities:
-					string, indices = self.resolve_entity(current_entities[entity])
-					entities.append({string : indices})
+				for j in xrange(on_entity):
+					current_entities[j].append(new_word)
+				"""
+				current_entity.append(new_word)
+			else:
 				"""
 				for entity in current_entities:
 					entities.append(current_entities[entity])
 				current_entities = defaultdict(list)
+				"""
+				if current_entity:
+					entities.append(current_entity)
+					current_entity = []
 
 			# end entity and entity type if there is a closure
 			on_entity -= word[-1].count(')')
@@ -119,7 +125,6 @@ class Document(object):
 		self.sentences = self.make_sentences(document)
 		#make a flat list of all entities in the document so each index is a 
 		#list corresponding to an entity
-		#self.entities = [j for j in i for i in [s.entities for s in self.sentences]]
 		self.entities = self.flatten_entities(self.sentences)
 		self.chains = defaultdict(list)
 		self.basename = basename
@@ -145,7 +150,6 @@ class Document(object):
 	def flatten_entities(self, sentences):
 		entities = []
 		for s in sentences:
-			#print s.entities
 			for i in s.entities:
 				entities.append(i)
 
