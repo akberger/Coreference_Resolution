@@ -22,7 +22,45 @@ class CoreferenceResolution(object):
 	def add_doc(self, f, basename):
 		self.documents.append(Document(f, basename))
 
-	def write_output(self, outdir):
+	def write_output(self, search_term='gold_conll', response_term='gold_conll'):
+		for doc in self.documents:
+			auto_path = ''.join([doc.basename.split(search_term)[0]] + [response_term])
+			#print auto_path
+			auto_file = open(auto_path)
+			response = open(doc.basename + '.response', 'w+')
+			mentions = []
+			for sent in doc.sentences:
+				for i, word in enumerate(sent.words):
+					chain = '-'
+					if word.chain:
+						if i == 0 and sent.words[i+1] and not sent.words[i+1].chain:
+							chain = '(' + str(word.chain) + ')'
+						elif i == len(sent.words) and sent.words[i-1] and not sent.words[i-1].chain:
+							chain = '(' + str(word.chain) + ')'
+						elif (i > 0 and i < len(sent.words)
+								   and not sent.words[i-1].chain
+								   and not sent.words[i+1].chain):
+							chain = '(' + str(word.chain) + ')'
+						elif word.chain and i > 0 and not sent.words[i-1].chain:
+							chain = '(' + str(word.chain)
+						elif word.chain and i == 0:
+							chain = '(' + str(word.chain)
+						elif word.chain and i <= len(sent.words) and not sent.words[i+1].chain:
+							chain = str(word.chain) + ')'
+					mentions.append(chain)
+			for line in auto_file:
+				if line.startswith('#'):
+					pass
+				elif line.split():
+					line = line.split()
+					line[-1] = mentions.pop(0)
+					line = '\t'.join(line)
+					
+				#print line
+				response.write(line + "\n")
+
+
+	def old_write_output(self, outdir):
 		for i, doc in enumerate(self.documents):
 			part = "0"
 			outfile = open(''.join([doc.basename, '.response']), 'w+')
@@ -151,23 +189,19 @@ class CoreferenceResolution(object):
 			for j, e2 in enumerate(doc.entities):
 				if j > i:
 					if e1[0].chain is not e2[0].chain: 
+
 						# check head matching assuming the word infinitive is the NP head
 						e1_heads = set([word.infinitive for word in e1 if word.infinitive is not None])
 						e2_heads = set([word.infinitive for word in e2 if word.infinitive is not None])
 						if len(e1_heads.intersection(e2_heads)) > 0:
-							#print [word.word for word in e1]
-							#print [word.word for word in e2]
-							#print e1_heads.intersection(e2_heads)
-							#print
 							self.chain(doc, e1, e2, e1[0].chain)
 
-						"""
 						# Check word inclusion
-						if len(e1) > len(e2):
-							if e1_words.issuperset(set(word.word for word in e2 if word not in self.stopwords)):
-								print [word.word for word in e1]
-								print [word.word for word in e2]
-						"""
+						if len(doc.chains[e2[0].chain]) == 1:
+							if len(e2) > 1:
+								if e1_words.issuperset(set(word.word for word in e2 if word not in self.stopwords)):
+									self.chain(doc, e1, e2, e1[0].chain)
+						
 						
 						
 	def appositive_pred_nominative(self, doc, e1, e2, constructs=[',','is','was']):
@@ -180,14 +214,39 @@ class CoreferenceResolution(object):
 				if [word.lower() for word in between_words if word in constructs]:
 					return True
 		return False
-	"""
+	
+
 	def pronoun_resolution(self, doc):
 		for sent in doc.sentences:
-			#if there is a pronoun in the sentence, it is likely referring to the
-			#closest other entity
+			#if there is a pronoun in the sentence, assume it is referring
+			#to the closest entity in the sentence if there is another
 			for i, entity in enumerate(sent.entities):
-	"""
+				if len(entity) == 1 and entity[0].word.lower() in self.pronouns:
+					#TODO: add checks for pronoun gender and number
+					if len(sent.entities) == 2:
+						self.chain(doc, entity, sent.entities[1], entity[0].chain)
+						#print [word.word for word in sent.entities[1]]
+						break
+					elif len(sent.entities) > 2:
+						if i == 0:
+							self.chain(doc, entity, sent.entities[1], entity[0].chain)
+							#print [word.word for word in sent.entities[1]]
+						elif i == len(sent.entities)-1:
+							self.chain(doc, entity, sent.entities[i-1], entity[0].chain)
+							#print [word.word for word in sent.entities[i-1]]
+						else:
+							prev_dist = entity[0].index - sent.entities[i-1][-1].index
+							next_dist = sent.entities[i+1][0].index - entity[-1].index
+							if prev_dist < next_dist:
+								self.chain(doc, entity, sent.entities[i-1], entity[0].chain)
+								#print [word.word for word in sent.entities[i-1]]
+							else:
+								self.chain(doc, entity, sent.entities[i+1], entity[0].chain)
+								#print [word.word for word in sent.entities[i+1]]
 
+					#print [word.word for word in entity]
+					#print [word.word for word in sent.words]
+					#print 
 
 	def resolve_entity(self, e):
 		return [word.word for word in e]
@@ -195,18 +254,45 @@ class CoreferenceResolution(object):
 	def resolve(self):
 		phases = [self.string_match, #must be run first
 				  self.precise_constructs,
-				  self.partial_string_match
+				  self.partial_string_match,
+				  self.pronoun_resolution
 				  ]
 
 		for phase in phases:
 			for doc in self.documents:
 				phase(doc)
 				#self.update_chain_dict(doc)
-				
+				"""
 				for chain in doc.chains:
 					print chain
 					for entity in doc.chains[chain]:
 						print [word.word for word in entity], word.sent_num, word.index, word.chain
+				"""
+
+	def concatenate_for_analysis(self, rootdir, search_term):
+		response = search_term + '.response'
+		gold_all = open(os.path.join(rootdir, 'all_gold'), 'w+')
+		response_all = open(os.path.join(rootdir, 'all_response'), 'w+')
+		for directory, subdir, files in os.walk(rootdir):
+			for fi in files:
+				#print 'fi' + fi
+				if fi.endswith(search_term):
+					print fi
+					f = open(os.path.join(directory, fi))
+					for line in f:
+						#print line
+						gold_all.write(line)
+				elif fi.endswith(response):
+					print fi
+					f = open(os.path.join(directory, fi))
+					for line in f:
+						#print line
+						response_all.write(line)
+		print gold_all.name 
+		print response_all.name
+				
+
+				
 				
 				
 
@@ -223,9 +309,10 @@ if __name__ == '__main__':
 	for directory, subdir, files in os.walk(rootdir):
 		for fi in files:
 			if fi.endswith(search_term):
-				f = open(os.path.join(directory, fi))
+				path = os.path.join(directory, fi)
+				f = open(path)
 				basename = fi.split('/')[-1]
-				cr.add_doc(f, basename)
+				cr.add_doc(f, path)
 	"""
 	for doc in cr.documents:
 		for sentence in doc.sentences:
@@ -233,7 +320,8 @@ if __name__ == '__main__':
 	"""
 
 	cr.resolve()
-	cr.write_output(sys.argv[2])
+	cr.write_output()
+	cr.concatenate_for_analysis(rootdir, search_term)
 
 
 

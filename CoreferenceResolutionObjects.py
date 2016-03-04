@@ -36,7 +36,7 @@ class Sentence(object):
 		#words - Word objects for each word in the sentence
 		#entities - list of lists of Word objects. Each index corresponds to an entity
 		self.words, self.entities = self.words_from_string(word_strings) 
-		self.tree = self.make_tree(word_strings)
+		#self.tree = self.make_tree(word_strings)
 		
 
 	def words_from_string(self, word_strings):
@@ -196,101 +196,3 @@ def test():
 
 if __name__ == '__main__':
 	test()
-
-
-'''
-class Node(object):
-	"""
-	irrelevant because using NLTK for SyntaxTrees
-	"""
-
-	def __init__(self, POS, data="", parent=""):
-		self.POS = POS
-		self.data = data
-		self.children = []
-		self.parent = parent
-		self.is_word = True if self.data is not None else False
-
-	def add_child(self, child):
-		self.children.append(child)
-
-
-class SyntaxTree(object):
-	"""
-	no need for this class anymore
-	"""
-
-	def __init__(self, word_strings):
-		self.tree = None
-
-	def pprint(self, indent=0, node=None):
-		if not node:
-			node = self.top
-
-		print node.POS + " children: " + str([child.POS for child in node.children])
-		for child in node.children:
-			print 'child.POS ' + child.POS
-			self.pprint(indent+1, child)
-
-	def make_tree(self, sentence):
-		cur = Node("TOP")
-		for i, word in enumerate(sentence):
-			print 'pprint'
-			self.pprint()
-			node = Node(word.POS)
-			POS = word.POS_phrase.split('(')
-
-
-			#print 'cur: POS ' + cur.POS + " children " + str([child.POS for child in cur.children])
-			#print word.word
-
-			for x in POS:
-				print 'x ' + x
-				if x == "TOP":
-					#print '1 ' + x
-					pass
-					#do nothing
-				elif ')' in x:	
-					x = x.split(')')
-					#print '2 ' + str(x)
-					# move back up tree for each end bracket
-					for end in x:
-						if end == '*':
-							#print '3 ' + end
-							cur.add_child(node)
-							#print cur.POS + " " + str([child.POS for child in cur.children])
-						else: 
-							#print '4 ' + end
-							cur = cur.parent
-				else:	
-					# We are at a part of speech node
-					if x == '*':
-						#print '5 ' + x
-						cur.add_child(node)
-						#print cur.POS + " " + str([child.POS for child in cur.children])
-						node.parent = cur
-					elif '*' in x:
-						#print '6 ' + x
-						new = Node(x.replace('*', ''), parent=cur)
-						cur.add_child(new)
-						#print cur.POS + " " + str([child.POS for child in cur.children])
-						leaf = Node(word.POS, data=word.POS, parent=new)
-						cur = new
-					elif x:
-						print '7 ' + x
-						new = Node(x, parent=cur)
-						print cur.POS + ' children :' + str([child.POS for child in cur.children])
-						cur.add_child(new)
-						print cur.POS + ' children :' + str([child.POS for child in cur.children])
-						#print cur.POS + " " + str([child.POS for child in cur.children])
-						cur = new
-					else:
-						#do nothing
-						#print '8 ' + x
-						pass
-						# we are probably at '', which is the first split '(' and
-						# nothing should be done ex: -->(<--S(NP*  from (S(NP*
-			node.parent = cur
-			if cur:
-				cur.add_child(node)
-'''
